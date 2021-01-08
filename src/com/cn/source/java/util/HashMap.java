@@ -473,6 +473,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * (16) and the default load factor (0.75).
      */
     public HashMap() {
+
         this.loadFactor = DEFAULT_LOAD_FACTOR; // all other fields defaulted
     }
 
