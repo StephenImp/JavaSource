@@ -429,7 +429,7 @@ public abstract class AbstractQueuedSynchronizer
          * CONDITION for condition nodes.  It is modified using CAS
          * (or when possible, unconditional volatile writes).
          */
-        volatile int waitStatus;
+        volatile int waitStatus;//当前Node的状态(线程的状态)
 
         /**
          * Link to predecessor node that current node/thread relies on
@@ -581,14 +581,27 @@ public abstract class AbstractQueuedSynchronizer
      * @return node's predecessor
      */
     private Node enq(final Node node) {
-        for (;;) {
-            Node t = tail;
+        for (;;) { // 无限死循环
+            Node t = tail; // 又把队尾赋值给了临时变量，
+            //第二次循环开始，由于在第一次已经设置了队列头(head)
             if (t == null) { // Must initialize
+                //第一次。队尾为空
+                // 内存值为null，预估值为null  更新值为 new Node()  所以可以进来
                 if (compareAndSetHead(new Node()))
+                    //CAS 设置队列的头部
+                    // 头部并不是一个 当前线程的Node，而是一个空的Node
+                    // 头部和尾部都是同一个指向 null
+                    // compareAndSetHead() 这里会设置head 为 new Node?没看到有代码啊？ todo
                     tail = head;
             } else {
+
+                //新加的节点的前指针指向队列头部(head)  入队
+                //所谓的入队，就是维护好链表的关系
                 node.prev = t;
+
+                //比较 tail(内存值) 与 t(预估值) 是否相同，相同 则把队列的尾部设置成 node
                 if (compareAndSetTail(t, node)) {
+                    //head 的 后指针指向 当前节点
                     t.next = node;
                     return t;
                 }
@@ -603,10 +616,11 @@ public abstract class AbstractQueuedSynchronizer
      * @return the new node
      */
     private Node addWaiter(Node mode) {
+        //构造一个新的Node
         Node node = new Node(Thread.currentThread(), mode);
         // Try the fast path of enq; backup to full enq on failure
-        Node pred = tail;
-        if (pred != null) {
+        Node pred = tail;//队尾 赋值给一个临时变量
+        if (pred != null) { // 第一次给这个队列添加node,队尾是为空的，不进if,直接走enq
             node.prev = pred;
             if (compareAndSetTail(pred, node)) {
                 pred.next = node;
@@ -809,7 +823,9 @@ public abstract class AbstractQueuedSynchronizer
                 node.prev = pred = pred.prev;
             } while (pred.waitStatus > 0);
             pred.next = node;
-        } else {
+        } else {//ws = 0
+
+            //ws = -1
             /*
              * waitStatus must be 0 or PROPAGATE.  Indicate that we
              * need a signal, but don't park yet.  Caller will need to
@@ -833,7 +849,7 @@ public abstract class AbstractQueuedSynchronizer
      * @return {@code true} if interrupted
      */
     private final boolean parkAndCheckInterrupt() {
-        LockSupport.park(this);
+        LockSupport.park(this); // 线程阻塞
         return Thread.interrupted();
     }
 
@@ -850,8 +866,8 @@ public abstract class AbstractQueuedSynchronizer
      * Acquires in exclusive uninterruptible mode for thread already in
      * queue. Used by condition wait methods as well as acquire.
      *
-     * @param node the node
-     * @param arg the acquire argument
+     * @param node the node  当前加入队列的节点
+     * @param arg the acquire argument  1
      * @return {@code true} if interrupted while waiting
      */
     final boolean acquireQueued(final Node node, int arg) {
@@ -859,15 +875,28 @@ public abstract class AbstractQueuedSynchronizer
         try {
             boolean interrupted = false;
             for (;;) {
+                //拿到这个节点的上一个节点
                 final Node p = node.predecessor();
+
+                //p == head
+                //判断前面是不是head -- (thread 为null 的Node)
+                //意思就是判断自己是不是第一个排队的；对比火车站买票 -- 窗口第一个 是正在买票的，不算排队 ， 第二个买票的才算是排队
+
+                //tryAcquire(arg)  去尝试拿锁？ 拿不到又自旋一次？todo
+                // 为什么要多自旋一次？
+                // 尽量的去较少park,
+
                 if (p == head && tryAcquire(arg)) {
                     setHead(node);
                     p.next = null; // help GC
                     failed = false;
                     return interrupted;
                 }
+
+                //拿不到锁后
                 if (shouldParkAfterFailedAcquire(p, node) &&
-                    parkAndCheckInterrupt())
+                    parkAndCheckInterrupt()//park
+                )
                     interrupted = true;
             }
         } finally {
@@ -1194,6 +1223,13 @@ public abstract class AbstractQueuedSynchronizer
      *        {@link #tryAcquire} but is otherwise uninterpreted and
      *        can represent anything you like.
      */
+
+    /**
+     *
+     * addWaiter(Node.EXCLUSIVE)  入队
+     *
+     * @param arg
+     */
     public final void acquire(int arg) {
         if (!tryAcquire(arg) &&
             acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
@@ -1516,6 +1552,9 @@ public abstract class AbstractQueuedSynchronizer
         Node t = tail; // Read fields in reverse initialization order
         Node h = head;
         Node s;
+        /**
+         *  h != t  判断队列的队首和队尾 是否相同 ，在非竞争状态下，直接返回false
+         */
         return h != t &&
             ((s = h.next) == null || s.thread != Thread.currentThread());
     }
