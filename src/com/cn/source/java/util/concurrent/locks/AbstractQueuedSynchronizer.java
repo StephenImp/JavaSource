@@ -1544,6 +1544,17 @@ public abstract class AbstractQueuedSynchronizer
      *         current thread, and {@code false} if the current thread
      *         is at the head of the queue or the queue is empty
      * @since 1.7
+     *
+     *
+     * 外面依旧有个!
+     *
+     *      返回false 外面继续执行CAS修改AQS 的 state ,设置队列的当前线程
+     *
+     *      返回true  外面不继续执行
+     *
+     *
+     *
+     *
      */
     public final boolean hasQueuedPredecessors() {
         // The correctness of this depends on head being initialized
@@ -1554,6 +1565,25 @@ public abstract class AbstractQueuedSynchronizer
         Node s;
         /**
          *  h != t  判断队列的队首和队尾 是否相同 ，在非竞争状态下，直接返回false
+         *
+         *
+         *  (s = h.next) == null
+         *      s = h.next  先赋值
+         *      再判断s==null
+         *
+         *   s.thread != Thread.currentThread()
+         *
+         *   s.thread ==> Node .thread = null 的节点的 的下一个节点(需要加锁的节点) 是不是执行线程调用的(Thread.currentThread())
+         *
+         *   如果是，返回false，外面变成true
+         *
+         *   如果不是，返回true,外面变成false
+         *
+         *
+         *   还有AQS的中间装填需要去考虑   此方法是非原子性的
+         *   当 h != t 成立  是没有竞争状态的
+         *   但此时 又线程节点入队了  那么该节点也是需要入队的，因为有其他节点比这个节点先拿到AQS的锁
+         *
          */
         return h != t &&
             ((s = h.next) == null || s.thread != Thread.currentThread());
